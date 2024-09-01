@@ -185,6 +185,26 @@ impl<'a> Drop for Base<'a> {
     }
 }
 
+fn home_dir() -> Option<PathBuf> {
+    // The home_dir bugs on windows are irrelevant as rpmoci is linux only
+    #![allow(deprecated)]
+    std::env::home_dir()
+}
+
+fn cache_dir() -> Option<PathBuf> {
+    std::env::var_os("XDG_CACHE_HOME")
+        .and_then(|x| {
+            if x.is_empty() {
+                None
+            } else {
+                Some(PathBuf::from(x))
+            }
+        })
+        //
+        .or_else(|| home_dir().map(|p| p.join(".cache")))
+        .map(|x| x.join("rpmoci"))
+}
+
 /// Initialize the dnf.Base object with the repositories configured in the rpmoci.toml
 /// The Base object also initializes and configures any system defined plugins
 pub(crate) fn setup_base<'a>(
@@ -196,10 +216,9 @@ pub(crate) fn setup_base<'a>(
     let base = dnf.getattr("Base")?.call0()?;
     let conf = base.getattr("conf")?;
 
-    // Set up caching and log dir to the value of RPMOCI_CACHE_DIR if it's set.
-    // When running in rootless mode rpmoci will set that, otherwise dnf will select
-    // diretory the user can't write to.
-    if let Ok(cache_dir) = env::var("RPMOCI_CACHE_DIR") {
+    // To support running in a user namespace override the cache and log directories
+    // as dnf will choose a dnf only root can write to.
+    if let Some(cache_dir) = cache_dir() {
         conf.setattr("cachedir", &cache_dir)?;
         conf.setattr("logdir", &cache_dir)?;
     }
