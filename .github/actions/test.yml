@@ -1,0 +1,21 @@
+name: "rpmoci tests"
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+    - name: Run cargo test
+      run: cargo test --features test-docker
+    - name: Setup rootless user
+      run: |
+        useradd -m -s /bin/bash rootless
+        echo "rootless:100000:65536" > /etc/subgid
+        echo "rootless:100000:65536" > /etc/subuid
+    - name: Build in rootless mode
+      run: |
+        su - rootless
+        cargo run -- build -f tests/fixtures/rootless/rpmoci.toml --image rootless --tag test
