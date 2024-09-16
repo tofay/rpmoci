@@ -16,10 +16,9 @@ const EXE: &str = env!("CARGO_BIN_EXE_rpmoci");
 fn rpmoci() -> Command {
     // if running as root
     let mut cmd = Command::new("unshare");
-    cmd.arg("--map-auto")
-        .arg("--map-root-user")
-        .arg("--user")
-        .arg(EXE);
+    // Don't use --map-auto here as that doesn't work on Azure Linux 2.0's unshare
+    // This will cause failures if tests install RPMs which create users
+    cmd.arg("--map-root-user").arg("--user").arg(EXE);
     cmd
 }
 
